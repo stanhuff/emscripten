@@ -82,11 +82,12 @@ def get(ports, settings, shared):
     ports.create_lib(final, o_s)
     return final
 
-  return [shared.Cache.get(libname, create, what='port')]
+  return [shared.Cache.getlib(libname, create, what='port')]
 
 
 def clear(ports, settings, shared):
-  shared.Cache.erase_file(ports.get_lib_name('libSDL2'))
+  libname = ports.get_lib_name('libSDL2' + ('-mt' if settings.USE_PTHREADS else ''))
+  shared.Cache.erase_lib(libname)
 
 
 def process_dependencies(settings):

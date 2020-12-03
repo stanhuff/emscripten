@@ -82,6 +82,10 @@ def run_one_command(cmd):
 
 
 def run_build_commands(commands):
+  # Before running a set of build commands make sure the common sysroot
+  # headers are installed.  This prevents each sub-process from attempting
+  # to setup the sysroot itself.
+  ensure_sysroot()
   cores = min(len(commands), building.get_num_cores())
   if cores <= 1:
     for command in commands:
@@ -326,7 +330,7 @@ class Library(object):
     return True
 
   def erase(self):
-    shared.Cache.erase_file(self.get_filename())
+    shared.Cache.erase_file(shared.Cache.get_lib_name(self.get_filename()))
 
   def get_path(self):
     """
@@ -334,7 +338,7 @@ class Library(object):
 
     This will trigger a build if this library is not in the cache.
     """
-    return shared.Cache.get(self.get_filename(), self.build)
+    return shared.Cache.getlib(self.get_filename(), self.build)
 
   def get_files(self):
     """
@@ -983,6 +987,7 @@ class libunwind(NoExceptLibrary, MTLibrary):
   name = 'libunwind'
   cflags = ['-Oz', '-D_LIBUNWIND_DISABLE_VISIBILITY_ANNOTATIONS']
   src_dir = ['system', 'lib', 'libunwind', 'src']
+  includes = [['system', 'lib', 'libunwind', 'include']]
   src_files = ['Unwind-wasm.cpp']
 
   def __init__(self, **kwargs):
@@ -1392,6 +1397,10 @@ def warn_on_unexported_main(symbolses):
         return
 
 
+def ensure_sysroot():
+  shared.Cache.get('sysroot_install.stamp', install_system_headers, what='system headers')
+
+
 def calculate(temp_files, cxx, forced, stdout_=None, stderr_=None):
   global stdout, stderr
   stdout = stdout_
@@ -1617,7 +1626,7 @@ class Ports(object):
 
   @staticmethod
   def get_include_dir():
-    dirname = shared.Cache.get_path('include')
+    dirname = shared.Cache.get_include_dir()
     shared.safe_ensure_dirs(dirname)
     return dirname
 
@@ -1918,7 +1927,7 @@ def build_port(port_name, settings):
 def add_ports_cflags(args, settings):
   # Legacy SDL1 port is not actually a port at all but builtin
   if settings.USE_SDL == 1:
-    args += ['-Xclang', '-isystem' + shared.path_from_root('system', 'include', 'SDL')]
+    args += ['-Xclang', '-iwithsysroot/include/SDL']
 
   needed = get_needed_ports(settings)
 
@@ -1929,6 +1938,46 @@ def add_ports_cflags(args, settings):
     args += port.process_args(Ports)
 
   return args
+
+
+# Once we require pythonn3.8 we can use shutil.copytree with dirs_exist_ok=True and
+# remove this function.
+def mycopytree(src, dest):
+  with utils.chdir(src):
+    for dirname, dirs, files in os.walk('.'):
+      destdir = os.path.join(dest, dirname)
+      utils.safe_ensure_dirs(destdir)
+      for f in files:
+        shared.safe_copy(os.path.join(src, dirname, f), os.path.join(destdir, f))
+
+
+def install_system_headers():
+  install_dirs = {
+    ('include',): '',
+    ('lib', 'compiler-rt', 'include'): '',
+    ('include', 'compat'): 'compat',
+    ('lib', 'libunwind', 'include'): '',
+    ('lib', 'libc', 'musl', 'arch', 'emscripten'): '',
+    ('lib', 'libcxx'): '',
+    ('include', 'libc'): '',
+    ('include', 'libcxx'): os.path.join('c++', 'v1'),
+    ('lib', 'libcxxabi', 'include'): os.path.join('c++', 'v1'),
+  }
+
+  target_include_dir = shared.Cache.get_include_dir()
+  for src, dest in install_dirs.items():
+    src = shared.path_from_root('system', *src)
+    dest = os.path.join(target_include_dir, dest)
+    mycopytree(src, dest)
+
+  # TODO(sbc): Move these headers back into thier respecive source trees
+  for dirname in ['libc', 'libcxx']:
+    shutil.rmtree(os.path.join(target_include_dir, dirname))
+
+  stamp = shared.Cache.get_path('sysroot_install.stamp')
+  with open(stamp, 'w') as f:
+    f.write('x')
+  return stamp
 
 
 def show_ports():

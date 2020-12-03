@@ -273,7 +273,7 @@ def check_sanity(force=False):
       return # config stored directly in EM_CONFIG => skip sanity checks
     expected = generate_sanity()
 
-    sanity_file = Cache.get_path('sanity.txt', root=True)
+    sanity_file = Cache.get_path('sanity.txt')
     if os.path.exists(sanity_file):
       sanity_data = open(sanity_file).read()
       if sanity_data != expected:
@@ -420,9 +420,7 @@ def emsdk_ldflags(user_args):
     return []
 
   library_paths = [
-      path_from_root('system', 'local', 'lib'),
-      path_from_root('system', 'lib'),
-      Cache.dirname
+      Cache.get_lib_dir(absolute=True)
   ]
   ldflags = ['-L' + l for l in library_paths]
 
@@ -437,12 +435,12 @@ def emsdk_ldflags(user_args):
   return ldflags
 
 
-def emsdk_cflags(user_args, cxx):
+def emsdk_cflags(user_args):
   # Disable system C and C++ include directories, and add our own (using
   # -isystem so they are last, like system dirs, which allows projects to
   # override them)
 
-  c_opts = ['--sysroot=' + path_from_root('system')]
+  c_opts = ['--sysroot=' + Cache.get_sysroot_dir(absolute=True)]
 
   def array_contains_any_of(hay, needles):
     for n in needles:
@@ -477,24 +475,13 @@ def emsdk_cflags(user_args, cxx):
 
   sysroot_include_paths = []
 
-  if cxx:
-    sysroot_include_paths += [
-      os.path.join('/include', 'libcxx'),
-      os.path.join('/lib', 'libcxxabi', 'include'),
-    ]
-
-  # TODO: Merge the cache into the sysroot.
-  c_opts += ['-Xclang', '-isystem' + Cache.get_path('include')]
-
   sysroot_include_paths += [
     os.path.join('/include', 'compat'),
-    os.path.join('/include', 'libc'),
-    os.path.join('/lib', 'libc', 'musl', 'arch', 'emscripten'),
-    os.path.join('/local', 'include'),
+    # TODO(sbc): Ideally we wouldn't need these, we could just copy them into the sysroot/include
+    # However, clang puts its internal header directory first so it finds its internal versions
+    # first.
     os.path.join('/include', 'SSE'),
     os.path.join('/include', 'neon'),
-    os.path.join('/lib', 'compiler-rt', 'include'),
-    os.path.join('/lib', 'libunwind', 'include'),
   ]
 
   def include_directive(paths):
@@ -511,7 +498,7 @@ def get_asmflags():
   return ['-target', get_llvm_target()]
 
 
-def get_cflags(user_args, cxx):
+def get_cflags(user_args):
   # Set the LIBCPP ABI version to at least 2 so that we get nicely aligned string
   # data and other nice fixes.
   c_opts = [# '-fno-threadsafe-statics', # disabled due to issue 1289
@@ -538,7 +525,7 @@ def get_cflags(user_args, cxx):
   if os.environ.get('EMMAKEN_NO_SDK') or '-nostdinc' in user_args:
     return c_opts
 
-  return c_opts + emsdk_cflags(user_args, cxx)
+  return c_opts + emsdk_cflags(user_args)
 
 
 # Settings. A global singleton. Not pretty, but nicer than passing |, settings| everywhere
@@ -745,11 +732,6 @@ def asmjs_mangle(name):
     return '_' + name
   else:
     return name
-
-
-def reconfigure_cache():
-  global Cache
-  Cache = cache.Cache(config.CACHE)
 
 
 class JS(object):
