@@ -1440,7 +1440,7 @@ keydown(100);keyup(100); // trigger the end
         document.dispatchEvent(event);
       }
     ''')
-    self.btest('sdl_pumpevents.c', expected='7', args=['--pre-js', 'pre.js', '-lSDL', '-lGL'])
+    self.btest_exit('sdl_pumpevents.c', expected='7', args=['--pre-js', 'pre.js', '-lSDL', '-lGL'])
 
   def test_sdl_canvas_size(self):
     self.btest('sdl_canvas_size.c', expected='1',
@@ -1719,7 +1719,7 @@ keydown(100);keyup(100); // trigger the end
 
   @requires_graphics_hardware
   def test_fulles2_sdlproc(self):
-    self.btest('full_es2_sdlproc.c', '1', args=['-s', 'GL_TESTING=1', '-DHAVE_BUILTIN_SINCOS', '-s', 'FULL_ES2=1', '-lGL', '-lSDL', '-lglut'])
+    self.btest_exit('full_es2_sdlproc.c', '1', args=['-s', 'GL_TESTING=1', '-DHAVE_BUILTIN_SINCOS', '-s', 'FULL_ES2=1', '-lGL', '-lSDL', '-lglut'])
 
   @requires_graphics_hardware
   def test_glgears_deriv(self):
@@ -4037,15 +4037,15 @@ window.close = function() {
 
   # Tests MAIN_THREAD_EM_ASM_INT() function call signatures.
   def test_main_thread_em_asm_signatures(self):
-    self.btest(path_from_root('tests', 'core', 'test_em_asm_signatures.cpp'), expected='121', args=[])
+    self.btest_exit(path_from_root('tests', 'core', 'test_em_asm_signatures.cpp'), expected='121', args=[])
 
   @requires_threads
   def test_main_thread_em_asm_signatures_pthreads(self):
-    self.btest(path_from_root('tests', 'core', 'test_em_asm_signatures.cpp'), expected='121', args=['-O3', '-s', 'USE_PTHREADS=1', '-s', 'PROXY_TO_PTHREAD=1', '-s', 'ASSERTIONS=1'])
+    self.btest_exit(path_from_root('tests', 'core', 'test_em_asm_signatures.cpp'), expected='121', args=['-O3', '-s', 'USE_PTHREADS=1', '-s', 'PROXY_TO_PTHREAD=1', '-s', 'ASSERTIONS=1'])
 
   @requires_threads
   def test_main_thread_async_em_asm(self):
-    self.btest(path_from_root('tests', 'core', 'test_main_thread_async_em_asm.cpp'), expected='0', args=['-O3', '-s', 'USE_PTHREADS=1', '-s', 'PROXY_TO_PTHREAD=1', '-s', 'ASSERTIONS=1'])
+    self.btest_exit(path_from_root('tests', 'core', 'test_main_thread_async_em_asm.cpp'), 0, args=['-O3', '-s', 'USE_PTHREADS=1', '-s', 'PROXY_TO_PTHREAD=1', '-s', 'ASSERTIONS=1'])
 
   @requires_threads
   def test_main_thread_em_asm_blocking(self):
@@ -4136,11 +4136,11 @@ window.close = function() {
       (['-O1', '-s', 'WASM_ASYNC_COMPILATION=0'], 0), # force it off
     ]:
       print(opts, expect)
-      self.btest('binaryen_async.c', expected=str(expect), args=common_args + opts)
+      self.btest_exit('binaryen_async.c', expected=expect, args=common_args + opts)
     # Ensure that compilation still works and is async without instantiateStreaming available
     no_streaming = ' <script> WebAssembly.instantiateStreaming = undefined;</script>'
     shell_with_script('shell.html', 'shell.html', no_streaming + script)
-    self.btest('binaryen_async.c', expected='1', args=common_args)
+    self.btest_exit('binaryen_async.c', expected=1, args=common_args)
 
   # Test that implementing Module.instantiateWasm() callback works.
   def test_manual_wasm_instantiate(self):
@@ -4436,18 +4436,18 @@ window.close = function() {
     # Test basic file loading and the valid character set for files.
     ensure_dir('dirrey')
     shutil.copyfile(path_from_root('tests', 'asmfs', 'hello_file.txt'), os.path.join(self.get_dir(), 'dirrey', 'hello file !#$%&\'()+,-.;=@[]^_`{}~ %%.txt'))
-    self.btest('asmfs/hello_file.cpp', expected='0', args=['-s', 'ASMFS=1', '-s', 'WASM=0', '-s', 'USE_PTHREADS=1', '-s', 'FETCH_DEBUG=1', '-s', 'PROXY_TO_PTHREAD=1'])
+    self.btest_exit('asmfs/hello_file.cpp', expected='0', args=['-s', 'ASMFS=1', '-s', 'WASM=0', '-s', 'USE_PTHREADS=1', '-s', 'FETCH_DEBUG=1', '-s', 'PROXY_TO_PTHREAD=1'])
 
   @requires_asmfs
   @requires_threads
   def test_asmfs_read_file_twice(self):
     shutil.copyfile(path_from_root('tests', 'asmfs', 'hello_file.txt'), 'hello_file.txt')
-    self.btest('asmfs/read_file_twice.cpp', expected='0', args=['-s', 'ASMFS=1', '-s', 'WASM=0', '-s', 'USE_PTHREADS=1', '-s', 'FETCH_DEBUG=1', '-s', 'PROXY_TO_PTHREAD=1'])
+    self.btest_exit('asmfs/read_file_twice.cpp', expected='0', args=['-s', 'ASMFS=1', '-s', 'WASM=0', '-s', 'USE_PTHREADS=1', '-s', 'FETCH_DEBUG=1', '-s', 'PROXY_TO_PTHREAD=1'])
 
   @requires_asmfs
   @requires_threads
   def test_asmfs_fopen_write(self):
-    self.btest('asmfs/fopen_write.cpp', expected='0', args=['-s', 'ASMFS=1', '-s', 'WASM=0', '-s', 'USE_PTHREADS=1', '-s', 'FETCH_DEBUG=1'])
+    self.btest_exit('asmfs/fopen_write.cpp', expected='0', args=['-s', 'ASMFS=1', '-s', 'WASM=0', '-s', 'USE_PTHREADS=1', '-s', 'FETCH_DEBUG=1'])
 
   @requires_asmfs
   @requires_threads
@@ -4488,7 +4488,7 @@ window.close = function() {
   @requires_asmfs
   @requires_threads
   def test_asmfs_relative_paths(self):
-    self.btest('asmfs/relative_paths.cpp', expected='0', args=['-s', 'ASMFS=1', '-s', 'WASM=0', '-s', 'USE_PTHREADS=1', '-s', 'FETCH_DEBUG=1'])
+    self.btest_exit('asmfs/relative_paths.cpp', expected='0', args=['-s', 'ASMFS=1', '-s', 'WASM=0', '-s', 'USE_PTHREADS=1', '-s', 'FETCH_DEBUG=1'])
 
   @requires_threads
   def test_pthread_locale(self):
@@ -4859,7 +4859,7 @@ window.close = function() {
   @requires_threads
   def test_offset_converter(self, *args):
     try:
-      self.btest(path_from_root('tests', 'browser', 'test_offset_converter.c'), '1', args=['-s', 'USE_OFFSET_CONVERTER', '-g4', '-s', 'PROXY_TO_PTHREAD', '-s', 'USE_PTHREADS'])
+      self.btest_exit(path_from_root('tests', 'browser', 'test_offset_converter.c'), '1', args=['-s', 'USE_OFFSET_CONVERTER', '-g4', '-s', 'PROXY_TO_PTHREAD', '-s', 'USE_PTHREADS'])
     except Exception as e:
       # dump the wasm file; this is meant to help debug #10539 on the bots
       print(self.run_process([os.path.join(building.get_binaryen_bin(), 'wasm-opt'), 'test.wasm', '-g', '--print', '-all'], stdout=PIPE).stdout)
