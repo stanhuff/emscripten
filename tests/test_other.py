@@ -9793,3 +9793,10 @@ exec "$@"
     result = self.run_js('test_split_module.js')
     self.assertNotIn('writing profile', result)
     self.assertIn('Hello! answer: 42', result)
+
+  def test_split_dwarf(self):
+    self.emcc_args += ['-gsplit-dwarf']
+    self.run_process([EMCC, '-c', path_from_root('tests', 'core', 'test_hello_world.c'), '-g', '-gsplit-dwarf'])
+    self.assertExists('test_hello_world.o')
+    # TODO(sbc): test the dwo is correct/usable
+    self.assertExists('test_hello_world.dwo')
