@@ -212,7 +212,8 @@ var LibraryManager = {
       }
     }
 
-    // apply synonyms. these are typically not speed-sensitive, and doing it this way makes it possible to not include hacks in the compiler
+    // apply synonyms. these are typically not speed-sensitive, and doing it
+    // this way makes it possible to not include hacks in the compiler
     // (and makes it simpler to switch between SDL versions, fastcomp and non-fastcomp, etc.).
     var lib = LibraryManager.library;
     libloop: for (var x in lib) {
@@ -233,22 +234,33 @@ var LibraryManager = {
         }
         if (!isNaN(target)) continue; // This is a number, and so cannot be an alias target.
         if (typeof lib[target] === 'undefined' || typeof lib[target] === 'function') {
-          // When functions are aliased, the alias target must provide a signature for the function so that an efficient form of forwarding can be implemented.
-          // Primarily read the signature on the alias, and secondarily on the target.
+          // When functions are aliased, a signature for the function must be
+          // provided so that an efficient form of forwarding can be
+          // implemented.
           function testStringType(sig) {
             if (typeof lib[sig] !== 'undefined' && typeof typeof lib[sig] !== 'string') {
               error(sig + ' should be a string! (was ' + typeof lib[sig]);
             }
           }
-          testStringType(x + '__sig');
-          testStringType(target + '__sig');
-          if (typeof lib[x + '__sig'] === 'string' && typeof lib[target + '__sig'] === 'string' && lib[x + '__sig'] != lib[target + '__sig']) {
-            error(x + '__sig (' + lib[x + '__sig'] + ')  differs from ' + target + '__sig (' + lib[target + '__sig'] + ')');
+          var alias_sig = x + '__sig';
+          var target_sig = target + '__sig';
+          testStringType(alias_sig);
+          testStringType(target_sig);
+          if (typeof lib[alias_sig] === 'string' && typeof lib[target_sig] === 'string' && lib[alias_sig] != lib[target_sig]) {
+            error(alias_sig + ' (' + lib[alias_sig] + ')  differs from ' + target_sig + ' (' + lib[target_sig] + ')');
           }
 
-          var sig = lib[x + '__sig'] || lib[target + '__sig'];
+          var sig = lib[alias_sig] || lib[target_sig];
           if (typeof sig !== 'string') {
-            error('Function ' + x + ' aliases to target function ' + target + ', but neither the alias or the target provide a signature. Please add a ' + target + "__sig: 'vifj...' annotation or a " + x + "__sig: 'vifj...' annotation to describe the type of function forwarding that is needed!");
+            error('Function ' + x + ' aliases to target function ' + target + ', but neither the alias or the target provide a signature. Please add a ' + target_sig + ": 'vifj...' annotation or a " + alias_sig + ": 'vifj...' annotation to describe the type of function forwarding that is needed!");
+          }
+
+          // If only one of the target or the aliis specifies a sig then copy
+          // this signature to the other.
+          if (!lib[alias_sig]) {
+            lib[alias_sig] = lib[target_sig];
+          } else if (!lib[target_sig]) {
+            lib[target_sig] = lib[alias_sig];
           }
 
           if (typeof lib[target] !== 'function') {
