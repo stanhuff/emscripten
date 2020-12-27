@@ -367,7 +367,7 @@ def type_to_cdec(raw):
     return ret
   return ret + '*'
 
-def render_function(class_name, func_name, sigs, return_type, non_pointer, copy, operator, constructor, func_scope, call_content=None, const=False, array_attribute=False):
+def render_function(class_name, func_name, sigs, return_type, non_pointer, copy, operator, constructor, isStatic, func_scope, call_content=None, const=False, array_attribute=False):
   global mid_c, mid_js, js_impl_methods
 
   legacy_mode = CHECKS not in ['ALL', 'FAST']
@@ -406,7 +406,7 @@ def render_function(class_name, func_name, sigs, return_type, non_pointer, copy,
       call_postfix += ')'
 
   args = [(all_args[i].identifier.name if isinstance(all_args[i], WebIDL.IDLArgument) else ('arg%d' % i)) for i in range(max_args)]
-  if not constructor:
+  if not constructor and not isStatic:
     body = '  var self = this.ptr;\n'
     pre_arg = ['self']
   else:
@@ -515,7 +515,7 @@ def render_function(class_name, func_name, sigs, return_type, non_pointer, copy,
     c_arg_types = list(map(type_to_c, sig))
 
     normal_args = ', '.join(['%s %s' % (c_arg_types[j], args[j]) for j in range(i)])
-    if constructor:
+    if constructor or isStatic:
       full_args = normal_args
     else:
       full_args = type_to_c(class_name, non_pointing=True) + '* self' + ('' if not normal_args else ', ' + normal_args)
@@ -525,6 +525,8 @@ def render_function(class_name, func_name, sigs, return_type, non_pointer, copy,
       call += '(' + call_args + ')'
     elif call_content is not None:
       call = call_content
+    elif isStatic:
+      call = type_to_c(class_name, non_pointing=True) + '::' + func_name + '(' + call_args + ')'
     else:
       call = 'self->' + func_name
       call += '(' + call_args + ')'
@@ -637,6 +639,7 @@ for name in names:
   for m in interface.members:
     if not m.isMethod(): continue
     constructor = m.identifier.name == name
+    isStatic = m.isStatic()
     if not constructor:
       parent_constructor = False
       temp = m.parentScope
@@ -647,8 +650,12 @@ for name in names:
       if parent_constructor:
         continue
     if not constructor:
-      mid_js += [r'''
+      if not isStatic:
+        mid_js += [r'''
 %s.prototype['%s'] = %s.prototype.%s = ''' % (name, m.identifier.name, name, m.identifier.name)]
+      else:
+        mid_js += [r'''
+%s['%s'] = %s.%s = ''' % (name, m.identifier.name, name, m.identifier.name)]
     sigs = {}
     return_type = None
     for ret, args in m.signatures():
@@ -666,6 +673,7 @@ for name in names:
                     m.getExtendedAttribute('Value'),
                     (m.getExtendedAttribute('Operator') or [None])[0],
                     constructor,
+                    isStatic,
                     func_scope=m.parentScope.identifier.name,
                     const=m.getExtendedAttribute('Const'))
     mid_js += [';\n']
@@ -675,6 +683,7 @@ for name in names:
   for m in interface.members:
     if not m.isAttr(): continue
     attr = m.identifier.name
+    isStatic = m.static
 
     if m.type.isArray():
       get_sigs = { 1: [Dummy({ 'type': WebIDL.BuiltinTypes[WebIDL.IDLBuiltinType.Types.long] })] }
@@ -693,38 +702,57 @@ for name in names:
       set_call_content = 'self->' + attr + ' = ' + deref_if_nonpointer(m) + 'arg0'
 
     get_name = 'get_' + attr
-    mid_js += [r'''
+    if not isStatic:
+      mid_js += [r'''
   %s.prototype['%s'] = %s.prototype.%s = ''' % (name, get_name, name, get_name)]
+    else:
+      mid_js += [r'''
+  %s['%s'] = %s.%s = ''' % (name, get_name, name, get_name)]
+
     render_function(name,
                     get_name, get_sigs, m.type.name,
                     None,
                     None,
                     None,
                     False,
+                    isStatic,
                     func_scope=interface,
                     call_content=get_call_content,
                     const=m.getExtendedAttribute('Const'),
                     array_attribute=m.type.isArray())
 
     if m.readonly:
-      mid_js += [r'''
+      if not isStatic:
+        mid_js += [r'''
     Object.defineProperty(%s.prototype, '%s', { get: %s.prototype.%s });''' % (name, attr, name, get_name)]
+      else:
+        mid_js += [r'''
+    Object.defineProperty(%s, '%s', { get: %s.%s });''' % (name, attr, name, get_name)]
     else:
       set_name = 'set_' + attr
-      mid_js += [r'''
+      if not isStatic:
+        mid_js += [r'''
     %s.prototype['%s'] = %s.prototype.%s = ''' % (name, set_name, name, set_name)]
+      else:
+        mid_js += [r'''
+    %s['%s'] = %s.%s = ''' % (name, set_name, name, set_name)]
       render_function(name,
                       set_name, set_sigs, 'Void',
                       None,
                       None,
                       None,
                       False,
+                      isStatic,
                       func_scope=interface,
                       call_content=set_call_content,
                       const=m.getExtendedAttribute('Const'),
                       array_attribute=m.type.isArray())
-      mid_js += [r'''
+      if not isStatic:
+        mid_js += [r'''
     Object.defineProperty(%s.prototype, '%s', { get: %s.prototype.%s, set: %s.prototype.%s });''' % (name, attr, name, get_name, name, set_name)]
+      else:
+        mid_js += [r'''
+    Object.defineProperty(%s, '%s', { get: %s.%s, set: %s.%s });''' % (name, attr, name, get_name, name, set_name)]
 
 
   if not interface.getExtendedAttribute('NoDelete'):
@@ -735,6 +763,7 @@ for name in names:
                     None,
                     None,
                     None,
+                    False,
                     False,
                     func_scope=interface,
                     call_content='delete self')
